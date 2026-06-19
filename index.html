@@ -76,7 +76,6 @@ button{font-family:var(--mono);}
 #titlebar{order:1;}
 #filtro-activo-bar{order:2;}
 #summary-bar{order:3;}
-#transport-bar{order:4;}
 #pages{order:5;}
 #nav-bar{order:6;}
 
@@ -177,25 +176,6 @@ button{font-family:var(--mono);}
 .month-row{display:flex;justify-content:space-between;margin-top:5px;}
 .month-label{font-size:8px;letter-spacing:2px;color:var(--ink2);text-transform:uppercase;}
 .month-pct{font-size:8px;color:var(--muted);}
-
-/* ══ TRANSPORT CONTROLS ══ */
-#transport-bar{
-  display:flex;gap:1px;
-  background:var(--line);
-  border-top:1px solid var(--line);
-  border-bottom:1px solid var(--line);
-  flex-shrink:0;
-}
-#transport-bar .icon-btn{
-  flex:1;
-  background:var(--carbon);
-  border:none;border-radius:0;
-  color:var(--ink2);font-size:14px;
-  padding:9px 0;cursor:pointer;
-  transition:all .15s;
-}
-#transport-bar .icon-btn:hover{background:var(--carbon2);color:var(--phos);}
-#transport-bar .icon-btn:active{background:var(--phos-ghost);}
 
 /* icon-btn genérico (titlebar) */
 .icon-btn{
@@ -802,16 +782,6 @@ button{font-family:var(--mono);}
       </div>
     </div>
   </div>
-</div>
-
-<!-- TRANSPORT CONTROLS -->
-<div id="transport-bar">
-  <button class="icon-btn" id="cal-filter-btn" onclick="openModal('modal-calendario')" title="Calendario / Filtro de fecha">📅</button>
-  <button class="icon-btn" onclick="openModal('modal-cuentas')" title="Cuentas">🏦</button>
-  <button class="icon-btn" onclick="openTransfer()" title="Transferir entre cuentas">🔄</button>
-  <button class="icon-btn" onclick="openModal('modal-pres')" title="Presupuestos">🎯</button>
-  <button class="icon-btn" onclick="exportData()" title="Exportar datos">⬇️</button>
-  <button class="icon-btn" onclick="importJSON()" title="Importar datos">⬆️</button>
 </div>
 
 <!-- NAV BUTTONS (central, metálico) -->
@@ -2693,8 +2663,6 @@ function setFiltroFecha(desde, hasta, modo, label){
   const bar = $('filtro-activo-bar');
   bar.style.display = 'flex';
   $('filtro-activo-label').textContent = '📅 ' + label;
-  $('cal-filter-btn').style.background = 'var(--phos-ghost)';
-  $('cal-filter-btn').style.color = 'var(--phos)';
   closeModal('modal-calendario');
   render();
 }
@@ -2702,8 +2670,6 @@ function setFiltroFecha(desde, hasta, modo, label){
 function clearFiltroFecha(){
   filtroFecha = { desde: null, hasta: null, modo: null };
   $('filtro-activo-bar').style.display = 'none';
-  $('cal-filter-btn').style.background = '';
-  $('cal-filter-btn').style.color = '';
   render();
 }
 
