@@ -1,4 +1,4 @@
-const CACHE_NAME = 'msn-gastos-v2';
+const CACHE_NAME = 'msn-gastos-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -21,8 +21,16 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first: siempre intenta traer la versión más reciente del servidor.
+// Solo recurre al cache (para uso offline) si la red falla.
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
