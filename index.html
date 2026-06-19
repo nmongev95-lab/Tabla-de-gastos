@@ -203,18 +203,18 @@ button{font-family:var(--mono);}
 }
 .icon-btn:hover{color:var(--phos);border-color:var(--phos-dim);}
 
-/* ══ NAV BAR — botón central metálico ══ */
+/* ══ NAV BAR — botones centrales metálicos ══ */
 #nav-bar{
-  display:flex;justify-content:center;
+  display:flex;justify-content:center;gap:8px;
   background:var(--carbon);
   border-top:1px solid var(--line);
   padding:8px 14px;
   flex-shrink:0;
 }
-#nav-btn{
+#nav-btn,#func-btn{
   display:flex;align-items:center;justify-content:center;gap:10px;
-  min-width:200px;
-  padding:11px 22px;
+  flex:1;min-width:0;
+  padding:11px 14px;
   font-family:var(--mono);font-size:11px;font-weight:700;
   letter-spacing:2px;text-transform:uppercase;
   color:#dfe8e4;cursor:pointer;
@@ -232,7 +232,7 @@ button{font-family:var(--mono);}
   text-shadow:0 1px 1px rgba(0,0,0,.7);
   transition:all .12s;
 }
-#nav-btn:hover{
+#nav-btn:hover,#func-btn:hover{
   color:var(--phos);
   text-shadow:var(--glow-soft);
   background:
@@ -240,17 +240,17 @@ button{font-family:var(--mono);}
     repeating-linear-gradient(90deg,#404a4e 0 1px,#363f42 1px 2px),
     linear-gradient(180deg,#525e62 0%,#343d40 50%,#232a2d 100%);
 }
-#nav-btn:active{
+#nav-btn:active,#func-btn:active{
   box-shadow:0 -1px 0 rgba(255,255,255,.1) inset,0 1px 0 rgba(0,0,0,.5) inset,0 1px 3px rgba(0,0,0,.6);
   transform:translateY(1px);
 }
 .nav-btn-caret{font-size:9px;color:var(--phos);transition:transform .2s;}
-#nav-btn.open .nav-btn-caret{transform:rotate(180deg);}
+#nav-btn.open .nav-btn-caret,#func-btn.open .nav-btn-caret{transform:rotate(180deg);}
 
-/* ══ NAV MENU — sheet desplegable ══ */
-#nav-menu{align-items:flex-end;padding:0;}
-#nav-menu.on{display:flex;}
-#nav-menu-sheet{
+/* ══ NAV MENU / FUNC MENU — sheet desplegable ══ */
+#nav-menu,#func-menu{align-items:flex-end;padding:0;}
+#nav-menu.on,#func-menu.on{display:flex;}
+#nav-menu-sheet,#func-menu-sheet{
   width:100%;
   background:var(--carbon);
   border-top:1px solid var(--line2);
@@ -263,7 +263,7 @@ button{font-family:var(--mono);}
   font-size:8px;letter-spacing:3px;color:var(--ink2);
   text-align:center;margin-bottom:12px;text-transform:uppercase;
 }
-#tabs{
+#tabs,#funcs{
   display:grid;grid-template-columns:1fr 1fr;gap:8px;
 }
 .tab{
@@ -611,6 +611,7 @@ button{font-family:var(--mono);}
 .inv-asset.crypto{border-left:2px solid var(--amber);}
 .inv-asset.accion{border-left:2px solid var(--blue);}
 .inv-asset-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.inv-coin-icon{width:20px;height:20px;flex-shrink:0;object-fit:contain;}
 .inv-ticker{font-size:12px;font-weight:700;color:var(--ink);letter-spacing:1.5px;}
 .inv-name{font-size:8px;color:var(--muted);flex:1;}
 .inv-type-badge{font-size:7px;padding:1px 5px;letter-spacing:.5px;}
@@ -810,10 +811,14 @@ button{font-family:var(--mono);}
   <button class="icon-btn" onclick="importJSON()" title="Importar datos">⬆️</button>
 </div>
 
-<!-- NAV BUTTON (central, metálico) -->
+<!-- NAV BUTTONS (central, metálico) -->
 <div id="nav-bar">
   <button id="nav-btn" onclick="toggleNavMenu()">
     <span id="nav-btn-label">💸 PRINCIPAL</span>
+    <span class="nav-btn-caret">▴</span>
+  </button>
+  <button id="func-btn" onclick="toggleFuncMenu()">
+    <span>⚙ FUNCIONES</span>
     <span class="nav-btn-caret">▴</span>
   </button>
 </div>
@@ -830,6 +835,21 @@ button{font-family:var(--mono);}
       <button class="tab" onclick="setTab('archivo')">📁 Archivo</button>
       <button class="tab" onclick="setTab('inversiones')">📈 Inversiones</button>
       <button class="tab" onclick="setTab('saldo')">⚖️ Saldo</button>
+    </div>
+  </div>
+</div>
+
+<!-- FUNC MENU (desplegable) -->
+<div class="modal-ov" id="func-menu" onclick="if(event.target===this)closeFuncMenu()">
+  <div id="func-menu-sheet">
+    <div class="nav-menu-title">FUNCIONES</div>
+    <div id="funcs">
+      <button class="tab" onclick="closeFuncMenu();openModal('modal-calendario')">📅 Calendario / Filtro</button>
+      <button class="tab" onclick="closeFuncMenu();openModal('modal-cuentas')">🏦 Cuentas</button>
+      <button class="tab" onclick="closeFuncMenu();openTransfer()">🔄 Transferir</button>
+      <button class="tab" onclick="closeFuncMenu();openModal('modal-pres')">🎯 Presupuestos</button>
+      <button class="tab" onclick="closeFuncMenu();exportData()">⬇️ Exportar datos</button>
+      <button class="tab" onclick="closeFuncMenu();importJSON()">⬆️ Importar datos</button>
     </div>
   </div>
 </div>
@@ -1335,6 +1355,15 @@ function toggleNavMenu(){
 function closeNavMenu(){
   $('nav-menu').classList.remove('on');
   const b=$('nav-btn'); if(b) b.classList.remove('open');
+}
+function toggleFuncMenu(){
+  const m=$('func-menu');
+  if(m.classList.contains('on')) closeFuncMenu();
+  else{ m.classList.add('on'); $('func-btn').classList.add('open'); }
+}
+function closeFuncMenu(){
+  $('func-menu').classList.remove('on');
+  const b=$('func-btn'); if(b) b.classList.remove('open');
 }
 
 // ══ MONTH PROGRESS ══
@@ -2025,8 +2054,12 @@ function renderAhorro(){
 }
 function toggleAhoSaldo(id){
   const a=D.ahorro.find(x=>x.id===id);
-  if(a){a.enSaldo=!a.enSaldo;addLog(a.enSaldo?'💰':'↩',`Ahorro ${a.enSaldo?'incluido en':'retirado del'} saldo: ${a.razon}`);}
-  save(); renderAhorro(); renderSummary();
+  if(!a) return;
+  const key='ahorro:'+id;
+  const nuevo=!getSaldoToggle(key,false);
+  addLog(nuevo?'💰':'↩',`Ahorro ${nuevo?'incluido en':'retirado del'} saldo: ${a.razon}`);
+  setSaldoToggle(key,nuevo); // fuente real del cálculo de saldo (también guarda y re-renderiza)
+  renderAhorro();
 }
 function delAhorro(id){
   const a=D.ahorro.find(x=>x.id===id);
@@ -2421,6 +2454,14 @@ function getSaldoToggle(key, defVal){
 
 function setSaldoToggle(key, val){
   getSaldoToggles()[key] = val;
+  // sincronizar con el flag de exhibición usado en Ahorro / Inversiones
+  if(key.startsWith('ahorro:')){
+    const a=D.ahorro.find(x=>x.id===key.slice(7));
+    if(a) a.enSaldo=val;
+  } else if(key.startsWith('inv:')){
+    const inv=D.inversiones.find(x=>x.id===key.slice(4));
+    if(inv) inv.enSaldo=val;
+  }
   save();
   renderSaldo();
   renderSummary(); // sincronizar barra de arriba
@@ -3068,10 +3109,12 @@ async function actualizarPrecios(){
 function toggleInvSaldo(id){
   const inv=D.inversiones.find(i=>i.id===id);
   if(!inv) return;
-  if(!inv.precioActualUSD&&!inv.enSaldo){showToast('Actualiza el precio primero');return;}
-  inv.enSaldo=!inv.enSaldo;
-  addLog(inv.enSaldo?'📈':'↩',`Portafolio ${inv.enSaldo?'incluido en':'retirado del'} saldo: ${inv.ticker}`);
-  save(); renderInversiones(); renderSummary();
+  const key='inv:'+id;
+  const nuevo=!getSaldoToggle(key,false);
+  if(nuevo&&!inv.precioActualUSD){showToast('Actualiza el precio primero');return;}
+  addLog(nuevo?'📈':'↩',`Portafolio ${nuevo?'incluido en':'retirado del'} saldo: ${inv.ticker}`);
+  setSaldoToggle(key,nuevo); // fuente real del cálculo de saldo (también guarda y re-renderiza)
+  renderInversiones();
 }
 
 function delInversion(id){
@@ -3142,6 +3185,7 @@ function renderInversiones(){
 
     return `<div class="inv-asset ${inv.tipo}">
       <div class="inv-asset-head">
+        ${inv.tipo==='crypto'?`<img class="inv-coin-icon" src="https://raw.githubusercontent.com/atomiclabs/cryptocurrency-icons/master/128/color/${inv.ticker.toLowerCase()}.png" onerror="this.style.display='none'" alt="">`:''}
         <span class="inv-ticker">${esc(inv.ticker)}</span>
         <span class="inv-name">${esc(inv.nombre)}</span>
         <span class="inv-type-badge ${inv.tipo}">${inv.tipo==='crypto'?'₿ Crypto':'📊 Acción'}</span>
