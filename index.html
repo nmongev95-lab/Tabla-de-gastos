@@ -499,6 +499,22 @@ button{font-family:var(--mono);}
   border-color:var(--phos-dim);text-shadow:var(--glow-soft);
 }
 
+/* ══ ASISTENTE IA ══ */
+.ia-chat{display:flex;flex-direction:column;gap:7px;max-height:300px;overflow-y:auto;padding:2px;margin-bottom:8px;}
+.ia-msg{padding:6px 9px;border:1px solid var(--line);font-size:11px;line-height:1.45;max-width:88%;white-space:pre-wrap;}
+.ia-msg.user{align-self:flex-end;background:var(--phos-ghost);border-color:var(--phos-dim);color:var(--ink);}
+.ia-msg.bot{align-self:flex-start;background:var(--void);color:var(--ink2);}
+.ia-msg img{max-width:100%;border-radius:4px;margin-bottom:5px;display:block;}
+.ia-img-prev{max-width:100%;max-height:140px;border-radius:4px;margin-bottom:6px;border:1px solid var(--line);object-fit:cover;}
+.ia-input-row{display:flex;gap:6px;align-items:flex-end;}
+.ia-input-row textarea{
+  flex:1;resize:none;min-height:30px;max-height:90px;
+  padding:6px 8px;border:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;
+  background:var(--carbon);color:var(--ink);
+}
+.ia-input-row textarea:focus{outline:none;border-color:var(--phos-dim);box-shadow:var(--glow-soft);}
+
 /* ══ PENDIENTES ══ */
 .pend-item{
   background:var(--carbon);border:1px solid var(--line);
@@ -812,6 +828,7 @@ button{font-family:var(--mono);}
   <button class="icon-btn" onclick="openModal('modal-pres')" title="Presupuestos">🎯</button>
   <button class="icon-btn" onclick="exportData()" title="Exportar datos">⬇️</button>
   <button class="icon-btn" onclick="importJSON()" title="Importar datos">⬆️</button>
+  <button class="icon-btn" onclick="openModal('modal-ia')" title="Asistente IA">🤖</button>
 </div>
 
 <!-- NAV BUTTONS (central, metálico) -->
@@ -853,6 +870,7 @@ button{font-family:var(--mono);}
       <button class="tab" onclick="closeFuncMenu();openModal('modal-pres')">🎯 Presupuestos</button>
       <button class="tab" onclick="closeFuncMenu();exportData()">⬇️ Exportar datos</button>
       <button class="tab" onclick="closeFuncMenu();importJSON()">⬆️ Importar datos</button>
+      <button class="tab" onclick="closeFuncMenu();openModal('modal-ia')">🤖 Asistente IA</button>
     </div>
   </div>
 </div>
@@ -1233,6 +1251,29 @@ button{font-family:var(--mono);}
     <div class="modal-body">
       <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Elige qué ahorro incluir en el saldo total. Puedes revertirlo cuando quieras.</p>
       <div id="aho-move-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ASISTENTE IA ══ -->
+<div class="modal-ov" id="modal-ia">
+  <div class="modal-win" style="max-width:480px">
+    <div class="modal-tbar">🤖 Asistente IA<button class="modal-x" onclick="closeModal('modal-ia')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-box" id="ia-key-box">
+        <h3>Clave API de Anthropic</h3>
+        <input type="password" id="ia-apikey" placeholder="sk-ant-...">
+        <button class="msn-btn accent sm" onclick="aiSaveKey()">💾 Guardar clave</button>
+        <p style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.4">Se guarda solo en este dispositivo (localStorage), nunca se envía a nadie más que a la API de Anthropic. Consíguela en console.anthropic.com.</p>
+      </div>
+      <div class="ia-chat" id="ia-chat"></div>
+      <img id="ia-img-prev" class="ia-img-prev" style="display:none">
+      <div class="ia-input-row">
+        <input type="file" id="ia-photo-file" accept="image/*" style="display:none" onchange="aiPickPhoto(this)">
+        <button class="msn-btn sm" onclick="document.getElementById('ia-photo-file').click()" title="Adjuntar foto de boleta/recibo">📷</button>
+        <textarea id="ia-input" rows="1" placeholder="Ej: Gasté 8000 en almuerzo hoy" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"></textarea>
+        <button class="msn-btn accent sm" id="ia-send-btn" onclick="aiSend()">➤ Enviar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2388,11 +2429,171 @@ function openModal(id){
     calSelectedDay=null;
     renderCalendario();
   }
+  if(id==='modal-ia'){
+    $('ia-apikey').value=aiGetKey();
+    aiRenderChat();
+  }
 }
 function closeModal(id){$(id).classList.remove('on');}
 document.querySelectorAll('.modal-ov').forEach(m=>{
   m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on');});
 });
+
+// ══════════════════════════════════════════
+// ASISTENTE IA (Claude) — chat de texto/foto para registrar gastos
+// ══════════════════════════════════════════
+const IA_KEY_STORAGE='msngas2_ia_key';
+let iaChatLog=[]; // {role:'user'|'bot', text, img}
+let iaPendingImage=null; // {mediaType,data,dataUrl}
+let iaBusy=false;
+
+function aiGetKey(){ return localStorage.getItem(IA_KEY_STORAGE)||''; }
+function aiSaveKey(){
+  const v=$('ia-apikey').value.trim();
+  if(!v){showToast('Ingresa una clave válida');return;}
+  localStorage.setItem(IA_KEY_STORAGE,v);
+  showToast('🔑 Clave guardada en este dispositivo');
+}
+
+function aiPickPhoto(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const dataUrl=reader.result;
+    const mediaType=dataUrl.slice(5,dataUrl.indexOf(';'));
+    const data=dataUrl.slice(dataUrl.indexOf(',')+1);
+    iaPendingImage={mediaType,data,dataUrl};
+    $('ia-img-prev').src=dataUrl;
+    $('ia-img-prev').style.display='block';
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+function aiRenderChat(){
+  const el=$('ia-chat');
+  if(!iaChatLog.length){
+    el.innerHTML='<div class="ia-msg bot">Hola 👋 Cuéntame qué gastaste o ingresaste (ej: "pagué 12000 en bencina") o adjunta la foto de una boleta y lo agrego automáticamente.</div>';
+    return;
+  }
+  el.innerHTML=iaChatLog.map(m=>`<div class="ia-msg ${m.role==='user'?'user':'bot'}">${m.img?`<img src="${m.img}">`:''}${esc(m.text)}</div>`).join('');
+  el.scrollTop=el.scrollHeight;
+}
+
+async function aiSend(){
+  if(iaBusy) return;
+  const text=$('ia-input').value.trim();
+  if(!text && !iaPendingImage){showToast('Escribe un mensaje o adjunta una foto');return;}
+  const key=aiGetKey();
+  if(!key){showToast('🔑 Primero guarda tu clave API de Anthropic arriba');return;}
+
+  iaChatLog.push({role:'user',text:text||'(foto adjunta)',img:iaPendingImage?iaPendingImage.dataUrl:null});
+
+  const content=[];
+  if(iaPendingImage) content.push({type:'image',source:{type:'base64',media_type:iaPendingImage.mediaType,data:iaPendingImage.data}});
+  content.push({type:'text',text:text||'Esta es la foto de mi boleta/recibo, extrae el gasto.'});
+
+  $('ia-input').value='';
+  iaPendingImage=null;
+  $('ia-img-prev').style.display='none';
+
+  iaBusy=true;
+  $('ia-send-btn').disabled=true;
+  iaChatLog.push({role:'bot',text:'⏳ Analizando...'});
+  aiRenderChat();
+
+  try{
+    const result=await aiParseExpense(content,key);
+    iaChatLog.pop();
+    if(result.ok){
+      const d=result.data;
+      aiApplyExpense(d);
+      iaChatLog.push({role:'bot',text:`✅ ${d.tipo==='ingreso'?'🟢 Ingreso':'🔴 Gasto'} agregado: ${d.razon} — ${clp(d.monto)} (${d.fecha})${d.categoria?' · 📂'+d.categoria:''}`});
+    } else {
+      iaChatLog.push({role:'bot',text:`⚠️ ${result.error}`});
+    }
+  } catch(err){
+    iaChatLog.pop();
+    iaChatLog.push({role:'bot',text:`⚠️ Error de conexión: ${err.message}`});
+  }
+  iaBusy=false;
+  $('ia-send-btn').disabled=false;
+  aiRenderChat();
+}
+
+async function aiParseExpense(content,key){
+  const schema={
+    type:'object',
+    properties:{
+      tipo:{type:'string',enum:['gasto','ingreso']},
+      monto:{type:'number'},
+      razon:{type:'string'},
+      fecha:{type:'string'},
+      categoria:{type:'string'},
+      cuenta:{type:'string'}
+    },
+    required:['tipo','monto','razon','fecha','categoria','cuenta'],
+    additionalProperties:false
+  };
+  const cuentasNombres=D.cuentas.map(c=>c.nombre).join(', ')||'ninguna registrada';
+
+  let res;
+  try{
+    res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-opus-4-8',
+        max_tokens:1024,
+        system:`Eres un asistente que extrae datos de un gasto o ingreso a partir de un mensaje de texto o una foto de una boleta/recibo, para una app de finanzas personales en pesos chilenos (CLP).
+Hoy es ${today()}. Si no se menciona una fecha, usa la de hoy, en formato YYYY-MM-DD.
+Si el monto no especifica moneda, asume pesos chilenos (CLP); devuélvelo como número sin puntos, comas ni símbolos.
+"tipo": "gasto" o "ingreso" (por defecto "gasto" si no es claro).
+"categoria": una palabra corta como Comida, Transporte, Entretenimiento, Salud, Hogar, Otros (cadena vacía "" si no se puede inferir).
+"cuenta": si el usuario menciona una cuenta y coincide con alguna de estas cuentas registradas: ${cuentasNombres}; devuélvela tal cual, si no, cadena vacía "".
+Responde solo con los datos extraídos del gasto/ingreso.`,
+        messages:[{role:'user',content}],
+        output_config:{format:{type:'json_schema',schema}}
+      })
+    });
+  } catch(e){
+    return {ok:false,error:'No se pudo conectar con la API de Anthropic'};
+  }
+
+  if(!res.ok){
+    const errBody=await res.json().catch(()=>({}));
+    return {ok:false,error:errBody?.error?.message||`Error HTTP ${res.status}`};
+  }
+  const data=await res.json();
+  const textBlock=(data.content||[]).find(b=>b.type==='text');
+  if(!textBlock) return {ok:false,error:'La respuesta no incluyó datos'};
+  let parsed;
+  try{ parsed=JSON.parse(textBlock.text); }
+  catch(e){ return {ok:false,error:'No se pudo interpretar la respuesta'}; }
+  if(!parsed.monto||parsed.monto<=0) return {ok:false,error:'No se pudo determinar un monto válido'};
+  return {ok:true,data:parsed};
+}
+
+function aiApplyExpense(d){
+  const cuenta=D.cuentas.find(c=>c.nombre===d.cuenta);
+  const cuentaId=cuenta?cuenta.id:'';
+  const pago=getPagoFromCuenta(cuentaId);
+  const razon=d.razon||'Sin descripción';
+  const item={id:uid(),monto:Math.round(d.monto),razon,fecha:d.fecha||today(),pago,cuenta:cuentaId,cat:d.categoria||'',icon:D.iconos[d.categoria||razon]||null,voucher:null,voucherMonto:''};
+  if(d.tipo==='ingreso') D.ingresos.unshift(item);
+  else D.gastos.unshift(item);
+  if(d.categoria) D.categorias[razon]=d.categoria;
+  addLog(d.tipo==='ingreso'?'🟢':'🔴',`${d.tipo==='ingreso'?'Ingreso':'Gasto'} agregado por IA: ${razon} ${clp(d.monto)}`,{tipo:d.tipo,item},'agregar');
+  archiveOldMonths();
+  save(); render();
+  checkPresupuesto(d.categoria);
+}
 
 // ══ TOAST ══
 function showToast(msg){
